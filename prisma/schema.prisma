@@ -1,0 +1,627 @@
+// ===========================================
+// PedigreeApp SaaS v2 - Schéma Prisma
+// ===========================================
+// Ce fichier définit le modèle de données complet de l'application.
+// Documentation: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================
+// AUTHENTIFICATION (NextAuth.js)
+// ===========================================
+
+/// Compte utilisateur principal
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?   // Hash bcrypt pour auth credentials
+  name          String?
+  image         String?   // URL de l'avatar
+  phone         String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations NextAuth
+  accounts Account[]
+  sessions Session[]
+
+  // Relations métier
+  ownedKennels Kennel[]         @relation("KennelOwner")
+  memberships  KennelMember[]
+
+  @@map("users")
+}
+
+/// Comptes OAuth liés (Google, etc.)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+/// Sessions utilisateur
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+/// Tokens de vérification email
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ===========================================
+// ÉLEVAGE (KENNEL)
+// ===========================================
+
+/// Élevage - entité principale multi-tenant
+model Kennel {
+  id         String   @id @default(cuid())
+  name       String   // Nom de l'élevage
+  affix      String?  // Affixe officiel
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  postalCode String?
+  country    String   @default("FR")
+  website    String?
+  siret      String?  // Numéro SIRET (France)
+  logo       String?  // URL du logo
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Propriétaire
+  ownerId String
+  owner   User   @relation("KennelOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Abonnement
+  subscription Subscription?
+
+  // Membres (accès partagé)
+  members KennelMember[]
+
+  // Données métier
+  dogs        Dog[]
+  litters     Litter[]
+  matings     Mating[]
+  clients     Client[]
+  sales       Sale[]
+  expenses    Expense[]
+  waitingList WaitingListEntry[]
+
+  @@index([ownerId])
+  @@map("kennels")
+}
+
+/// Membre d'un élevage (accès partagé)
+model KennelMember {
+  id        String           @id @default(cuid())
+  kennelId  String
+  userId    String
+  role      KennelMemberRole @default(VIEWER)
+  createdAt DateTime         @default(now())
+
+  kennel Kennel @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([kennelId, userId])
+  @@map("kennel_members")
+}
+
+// ===========================================
+// ABONNEMENT (STRIPE)
+// ===========================================
+
+/// Abonnement Stripe
+model Subscription {
+  id                   String             @id @default(cuid())
+  kennelId             String             @unique
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  plan                 Plan               @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  kennel Kennel @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@map("subscriptions")
+}
+
+// ===========================================
+// CHIENS
+// ===========================================
+
+/// Chien - entité principale
+model Dog {
+  id                 String          @id @default(cuid())
+  kennelId           String
+  name               String          // Nom usuel
+  registeredName     String?         // Nom LOF/pedigree complet
+  breed              String          // Race
+  sex                Sex
+  birthDate          DateTime?
+  deathDate          DateTime?
+  color              String?         // Couleur de robe
+  microchip          String?         // Numéro de puce (15 chiffres)
+  tattoo             String?         // Numéro de tatouage
+  registrationNumber String?         // Numéro LOF
+  breedingStatus     BreedingStatus  @default(NOT_BREEDING)
+  healthStatus       HealthStatus    @default(HEALTHY)
+  presenceStatus     PresenceStatus  @default(ACTIVE)
+  origin             DogOrigin       @default(INTERNAL)
+  isOwned            Boolean         @default(true)
+  weight             Float?          // Poids en kg
+  height             Float?          // Taille en cm
+  coatType           String?         // Type de poil
+  titles             String?         // Titres obtenus
+  cotation           String?         // Cotation LOF
+  temperament        String?
+  studFee            Float?          // Prix de saillie
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  // Relations parentales
+  sireId String?
+  damId  String?
+  sire   Dog?    @relation("Sire", fields: [sireId], references: [id], onDelete: SetNull)
+  dam    Dog?    @relation("Dam", fields: [damId], references: [id], onDelete: SetNull)
+
+  // Descendants
+  offspringAsSire Dog[] @relation("Sire")
+  offspringAsDam  Dog[] @relation("Dam")
+
+  // Élevage
+  kennel Kennel @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+
+  // Données associées
+  photos       DogPhoto[]
+  healthRecords HealthRecord[]
+  geneticTests GeneticTest[]
+  heats        Heat[]
+
+  // Portées
+  littersAsSire Litter[] @relation("LitterSire")
+  littersAsDam  Litter[] @relation("LitterDam")
+  litterBornIn  Litter?  @relation("LitterPuppies", fields: [litterId], references: [id])
+  litterId      String?
+
+  // Accouplements
+  matingsAsSire Mating[] @relation("MatingSire")
+  matingsAsDam  Mating[] @relation("MatingDam")
+
+  // Ventes et dépenses
+  sales    Sale[]
+  expenses Expense[]
+
+  @@unique([kennelId, microchip])
+  @@unique([kennelId, registrationNumber])
+  @@index([kennelId])
+  @@index([breed])
+  @@index([sex])
+  @@index([sireId])
+  @@index([damId])
+  @@map("dogs")
+}
+
+/// Photo de chien
+model DogPhoto {
+  id        String   @id @default(cuid())
+  dogId     String
+  url       String   // URL de l'image (UploadThing)
+  isPrimary Boolean  @default(false)
+  caption   String?
+  createdAt DateTime @default(now())
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@index([dogId])
+  @@map("dog_photos")
+}
+
+// ===========================================
+// SANTÉ
+// ===========================================
+
+/// Enregistrement de santé (vaccins, visites, etc.)
+model HealthRecord {
+  id            String           @id @default(cuid())
+  dogId         String
+  recordType    HealthRecordType
+  recordDate    DateTime
+  title         String
+  description   String?
+  veterinarian  String?
+  cost          Float?
+  nextDueDate   DateTime?        // Pour les rappels
+  attachmentUrl String?          // Pièce jointe
+  reminderSent  Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@index([dogId])
+  @@index([recordType])
+  @@index([nextDueDate])
+  @@map("health_records")
+}
+
+/// Test génétique
+model GeneticTest {
+  id                String            @id @default(cuid())
+  dogId             String
+  testName          String
+  testDate          DateTime
+  result            GeneticTestResult
+  laboratory        String?
+  certificateNumber String?
+  attachmentUrl     String?
+  notes             String?
+  createdAt         DateTime          @default(now())
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@index([dogId])
+  @@index([testName])
+  @@map("genetic_tests")
+}
+
+// ===========================================
+// REPRODUCTION
+// ===========================================
+
+/// Chaleurs d'une femelle
+model Heat {
+  id        String    @id @default(cuid())
+  dogId     String
+  startDate DateTime
+  endDate   DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+
+  dog Dog @relation(fields: [dogId], references: [id], onDelete: Cascade)
+
+  @@index([dogId])
+  @@index([startDate])
+  @@map("heats")
+}
+
+/// Accouplement
+model Mating {
+  id          String     @id @default(cuid())
+  kennelId    String
+  sireId      String
+  damId       String
+  matingDate  DateTime
+  matingType  MatingType @default(NATURAL)
+  success     Boolean?   // null = en attente, true = confirmé, false = échec
+  notes       String?
+  createdAt   DateTime   @default(now())
+
+  kennel Kennel  @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+  sire   Dog     @relation("MatingSire", fields: [sireId], references: [id], onDelete: Cascade)
+  dam    Dog     @relation("MatingDam", fields: [damId], references: [id], onDelete: Cascade)
+  litter Litter?
+
+  @@index([kennelId])
+  @@index([sireId])
+  @@index([damId])
+  @@map("matings")
+}
+
+/// Portée
+model Litter {
+  id           String       @id @default(cuid())
+  kennelId     String
+  sireId       String
+  damId        String
+  matingId     String?      @unique
+  birthDate    DateTime
+  expectedDate DateTime?
+  totalPuppies Int          @default(0)
+  males        Int          @default(0)
+  females      Int          @default(0)
+  stillborn    Int          @default(0)
+  status       LitterStatus @default(EXPECTED)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  kennel  Kennel  @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+  sire    Dog     @relation("LitterSire", fields: [sireId], references: [id], onDelete: Cascade)
+  dam     Dog     @relation("LitterDam", fields: [damId], references: [id], onDelete: Cascade)
+  mating  Mating? @relation(fields: [matingId], references: [id], onDelete: SetNull)
+  puppies Dog[]   @relation("LitterPuppies")
+
+  waitingList WaitingListEntry[]
+  expenses    Expense[]
+
+  @@index([kennelId])
+  @@index([sireId])
+  @@index([damId])
+  @@index([birthDate])
+  @@index([status])
+  @@map("litters")
+}
+
+// ===========================================
+// CLIENTS & VENTES
+// ===========================================
+
+/// Client (acheteur ou éleveur partenaire)
+model Client {
+  id         String     @id @default(cuid())
+  kennelId   String
+  firstName  String
+  lastName   String
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  postalCode String?
+  country    String     @default("FR")
+  clientType ClientType @default(BUYER)
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  kennel      Kennel             @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+  sales       Sale[]
+  waitingList WaitingListEntry[]
+
+  @@index([kennelId])
+  @@index([lastName, firstName])
+  @@map("clients")
+}
+
+/// Vente d'un chien
+model Sale {
+  id             String        @id @default(cuid())
+  kennelId       String
+  dogId          String
+  clientId       String?
+  saleDate       DateTime
+  price          Float
+  currency       String        @default("EUR")
+  paymentMethod  PaymentMethod @default(TRANSFER)
+  contractSigned Boolean       @default(false)
+  contractUrl    String?
+  notes          String?
+  createdAt      DateTime      @default(now())
+
+  kennel Kennel  @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+  dog    Dog     @relation(fields: [dogId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([kennelId])
+  @@index([dogId])
+  @@index([clientId])
+  @@index([saleDate])
+  @@map("sales")
+}
+
+/// Liste d'attente
+model WaitingListEntry {
+  id             String            @id @default(cuid())
+  kennelId       String
+  clientId       String
+  litterId       String?
+  preferredSex   PreferredSex?
+  preferredColor String?
+  position       Int
+  depositPaid    Boolean           @default(false)
+  depositAmount  Float?
+  status         WaitingListStatus @default(WAITING)
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  kennel Kennel  @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+  client Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  litter Litter? @relation(fields: [litterId], references: [id], onDelete: SetNull)
+
+  @@index([kennelId])
+  @@index([clientId])
+  @@index([status])
+  @@map("waiting_list")
+}
+
+// ===========================================
+// FINANCES
+// ===========================================
+
+/// Dépense
+model Expense {
+  id          String          @id @default(cuid())
+  kennelId    String
+  category    ExpenseCategory
+  amount      Float
+  currency    String          @default("EUR")
+  expenseDate DateTime
+  dogId       String?
+  litterId    String?
+  description String?
+  vendor      String?
+  receiptUrl  String?
+  createdAt   DateTime        @default(now())
+
+  kennel Kennel  @relation(fields: [kennelId], references: [id], onDelete: Cascade)
+  dog    Dog?    @relation(fields: [dogId], references: [id], onDelete: SetNull)
+  litter Litter? @relation(fields: [litterId], references: [id], onDelete: SetNull)
+
+  @@index([kennelId])
+  @@index([category])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+// ===========================================
+// ENUMS
+// ===========================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum KennelMemberRole {
+  VIEWER  // Lecture seule
+  EDITOR  // Lecture + écriture
+  ADMIN   // Tout sauf suppression élevage
+}
+
+enum Plan {
+  FREE
+  PRO
+  ELITE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum BreedingStatus {
+  NOT_BREEDING
+  BREEDING
+  RETIRED
+}
+
+enum HealthStatus {
+  HEALTHY
+  SICK
+  DECEASED
+  UNKNOWN
+}
+
+enum PresenceStatus {
+  ACTIVE
+  RETIRED
+  DECEASED
+  SOLD
+  EXTERNAL
+}
+
+enum DogOrigin {
+  INTERNAL
+  EXTERNAL
+}
+
+enum LitterStatus {
+  EXPECTED
+  BORN
+  WEANING
+  READY
+  COMPLETED
+}
+
+enum MatingType {
+  NATURAL
+  AI_FRESH
+  AI_CHILLED
+  AI_FROZEN
+}
+
+enum HealthRecordType {
+  VACCINE
+  VET_VISIT
+  TEST
+  SURGERY
+  MEDICATION
+  INJURY
+  OTHER
+}
+
+enum GeneticTestResult {
+  CLEAR
+  CARRIER
+  AFFECTED
+  PENDING
+  UNKNOWN
+}
+
+enum ClientType {
+  BUYER
+  BREEDER
+  BOTH
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  TRANSFER
+  OTHER
+}
+
+enum WaitingListStatus {
+  WAITING
+  MATCHED
+  COMPLETED
+  CANCELLED
+}
+
+enum PreferredSex {
+  MALE
+  FEMALE
+  NO_PREFERENCE
+}
+
+enum ExpenseCategory {
+  FOOD
+  VETERINARY
+  BREEDING
+  EQUIPMENT
+  INSURANCE
+  SHOWS
+  TRAVEL
+  OTHER
+}

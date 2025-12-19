@@ -1,0 +1,268 @@
+/**
+ * Styles globaux - PedigreeApp SaaS v2
+ * Utilise le système de design shadcn/ui avec Tailwind CSS
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Couleurs de base - Mode clair */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    
+    /* Couleurs personnalisées */
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    
+    --warning: 45.4 93.4% 47.5%;
+    --warning-foreground: 26 83.3% 14.1%;
+    
+    --info: 199.4 95.5% 53.8%;
+    --info-foreground: 0 0% 100%;
+    
+    /* Couleurs pour les sexes */
+    --male: 217.2 91.2% 59.8%;
+    --male-foreground: 0 0% 100%;
+    
+    --female: 330.4 81.2% 60.4%;
+    --female-foreground: 0 0% 100%;
+    
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Couleurs de base - Mode sombre */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    
+    /* Couleurs personnalisées - Mode sombre */
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144.9 80.4% 10%;
+    
+    --warning: 45.4 93.4% 47.5%;
+    --warning-foreground: 26 83.3% 14.1%;
+    
+    --info: 199.4 95.5% 53.8%;
+    --info-foreground: 0 0% 100%;
+    
+    /* Couleurs pour les sexes - Mode sombre */
+    --male: 217.2 91.2% 59.8%;
+    --male-foreground: 0 0% 100%;
+    
+    --female: 330.4 81.2% 60.4%;
+    --female-foreground: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Amélioration du scroll */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Scrollbar personnalisée */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  /* Container de page standard */
+  .page-container {
+    @apply container mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6;
+  }
+  
+  /* En-tête de page */
+  .page-header {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4;
+  }
+  
+  .page-title {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight;
+  }
+  
+  .page-description {
+    @apply text-muted-foreground;
+  }
+  
+  /* Champ de formulaire */
+  .form-field {
+    @apply space-y-2;
+  }
+  
+  .form-label {
+    @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+  }
+  
+  .form-error {
+    @apply text-sm text-destructive;
+  }
+  
+  /* Spinner de chargement */
+  .spinner {
+    @apply animate-spin rounded-full border-t-transparent;
+  }
+  
+  /* Carte avec hover */
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:border-primary/20;
+  }
+  
+  /* Badge pour le sexe */
+  .badge-male {
+    @apply bg-male text-male-foreground;
+  }
+  
+  .badge-female {
+    @apply bg-female text-female-foreground;
+  }
+  
+  /* Statuts */
+  .status-success {
+    @apply bg-success/10 text-success border-success/20;
+  }
+  
+  .status-warning {
+    @apply bg-warning/10 text-warning border-warning/20;
+  }
+  
+  .status-error {
+    @apply bg-destructive/10 text-destructive border-destructive/20;
+  }
+  
+  .status-info {
+    @apply bg-info/10 text-info border-info/20;
+  }
+  
+  /* Pedigree tree */
+  .pedigree-node {
+    @apply relative;
+  }
+  
+  .pedigree-node::before {
+    @apply absolute left-0 top-1/2 w-4 h-px bg-border -translate-x-full;
+    content: '';
+  }
+  
+  .pedigree-node:first-child::before {
+    @apply hidden;
+  }
+}
+
+@layer utilities {
+  /* Animation de fade in */
+  .animate-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Truncate multi-lignes */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60;
+  }
+  
+  /* Glass effect */
+  .glass {
+    @apply bg-background/80 backdrop-blur-sm;
+  }
+}
