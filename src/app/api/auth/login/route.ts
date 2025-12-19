@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
-import { cookies } from 'next/headers';
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.NEXTAUTH_SECRET || 'your-secret-key-change-in-production'
@@ -68,16 +67,6 @@ export async function POST(request: NextRequest) {
       .setExpirationTime('30d')
       .sign(JWT_SECRET);
 
-    // Définir le cookie
-    const cookieStore = await cookies();
-    cookieStore.set('auth-token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 jours
-      path: '/',
-    });
-
     // Combiner les élevages possédés et les memberships
     const allKennels = [
       ...user.ownedKennels.map((k) => ({
@@ -94,8 +83,8 @@ export async function POST(request: NextRequest) {
       })),
     ];
 
-    // Retourner les infos utilisateur (sans le mot de passe)
-    return NextResponse.json({
+    // Créer la réponse avec le cookie
+    const response = NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
@@ -104,6 +93,17 @@ export async function POST(request: NextRequest) {
         kennels: allKennels,
       },
     });
+
+    // Définir le cookie sur la réponse
+    response.cookies.set('auth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60, // 30 jours
+      path: '/',
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
